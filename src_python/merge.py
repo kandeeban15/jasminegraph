@@ -47,7 +47,7 @@ path_nodes_localstore = args['path_localstore'] + args['graph_id'] + '_attribute
 nodes_localstore = pd.read_csv(path_nodes_localstore , sep='\s+', lineterminator='\n',header=None)
 nodes_localstore.set_index(0,inplace=True)
 
-path_edges_localstore = args['path_localstore'] + args['graph_id'] + '_' + args['partition_id']
+path_edges_localstore = args['path_centralstore'] + args['graph_id'] + '_' + args['partition_id']
 edges_localstore = pd.read_csv(path_edges_localstore, sep='\s+', lineterminator='\n', header=None)
 edges_localstore.columns = ["source","target"]
 
