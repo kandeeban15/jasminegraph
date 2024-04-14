@@ -29,13 +29,14 @@ class NodeBlock {
     bool isDirected = false;
 
  public:
-    static const unsigned long BLOCK_SIZE = 24;  // Size of a node block in bytes
+    static const unsigned long BLOCK_SIZE = 28;  // Size of a node block in bytes
     static const unsigned int LABEL_SIZE = 6;    // Size of a node label in bytes
     unsigned int addr = 0;
     std::string id = "";  // Node ID for this block ie: citation paper ID, Facebook accout ID, Twitter account ID etc
 
     char usage = false;   // Whether this block is in use or not
     unsigned int nodeId;  // nodeId for each block
+    unsigned int pid;
     unsigned int edgeRef = 0;         // edges database block address for relations size of edgeRef is 4 bytes
     unsigned int centralEdgeRef = 0;  // edges cut database block address for edge cut relations
     unsigned char edgeRefPID = 0;     // Partition ID of the edge reference
@@ -54,7 +55,8 @@ class NodeBlock {
         id = newId;
         nodeId = node;
         addr = address;
-        usage = true;
+        usage = 't';
+        pid = 0;
     };
 
     NodeBlock(std::string id, unsigned int nodeId, unsigned int address, unsigned int propRef, unsigned int edgeRef,
@@ -80,6 +82,7 @@ class NodeBlock {
 
     bool setLocalRelationHead(RelationBlock);
     bool setCentralRelationHead(RelationBlock newRelation);
+    bool setPartitionId(unsigned int pid);
 
     std::list<NodeBlock*> getLocalEdgeNodes();
     std::list<NodeBlock*> getCentralEdgeNodes();

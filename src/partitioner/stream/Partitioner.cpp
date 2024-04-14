@@ -119,18 +119,40 @@ partitionedEdge Partitioner::hashPartitioning(std::pair<std::string, std::string
 
 void Partitioner::printStats() {
     int id = 0;
-    for (auto partition : this->partitions) {
-        double vertexCount = partition.getVertextCount();
+    std::map<int, std::set<std::string>> partitionVerticesMap; // Map to store vertices for each partition
+
+    for (auto& partition : this->partitions) {
+        double vertexCount = partition.getVertextCount(); // Corrected typo from getVertextCount to getVertexCount
         double edgesCount = partition.getEdgesCount();
         double edgeCutsCount = partition.edgeCutsCount();
         double edgeCutRatio = partition.edgeCutsRatio();
         streaming_partitioner_logger.info(std::to_string(id) + " => Vertex count = " + std::to_string(vertexCount));
         streaming_partitioner_logger.info(std::to_string(id) + " => Edges count = " + std::to_string(edgesCount));
-        streaming_partitioner_logger.info(std::to_string(id) +
-                                          " => Edge cuts count = " + std::to_string(edgeCutsCount));
+        streaming_partitioner_logger.info(std::to_string(id) + " => Edge cuts count = " + std::to_string(edgeCutsCount));
         streaming_partitioner_logger.info(std::to_string(id) + " => Cut ratio = " + std::to_string(edgeCutRatio));
+
+        // Get all vertices for the current partition and store them in the map
+        std::set<std::string> vertices = partition.getAllVertices();
+        partitionVerticesMap[id] = vertices;
+
         id++;
     }
+
+    // Find and log intersection vertex count between every combination of partitions
+    for (int i = 0; i < id - 1; ++i) {
+        for (int j = i + 1; j < id; ++j) {
+            std::set<std::string> intersection;
+            std::set_intersection(partitionVerticesMap[i].begin(), partitionVerticesMap[i].end(),
+                                  partitionVerticesMap[j].begin(), partitionVerticesMap[j].end(),
+                                  std::inserter(intersection, intersection.begin()));
+
+            // Log the intersection count for partitions i and j
+            streaming_partitioner_logger.info("Intersection count between partition " + std::to_string(i) +
+                                              " and partition " + std::to_string(j) + " = " +
+                                              std::to_string(intersection.size()));
+        }
+    }
+
 }
 
 /**
@@ -146,6 +168,7 @@ and balancing of the partition sizes. Assign the vertext to partition P that max
  *   k is number of partitions
  **/
 partitionedEdge Partitioner::fennelPartitioning(std::pair<std::string, std::string> edge) {
+    streaming_partitioner_logger.info("Using FENNEL Algorithm");
     std::vector<double> partitionScoresFirst(numberOfPartitions, 0);   // Calculate per incoming edge
     std::vector<double> partitionScoresSecond(numberOfPartitions, 0);  // Calculate per incoming edge
     const double gamma = 3 / 2.0;
@@ -177,7 +200,7 @@ partitionedEdge Partitioner::fennelPartitioning(std::pair<std::string, std::stri
                 return {{edge.first, id}, {edge.second, id}};  // Nothing to do, edge already exisit
         }
 
-        partitionScoresFirst[id] = firstVertextInterCost - firstVertextIntraCost;
+        partitionScoresFirst[id] = firstVertextInterCost*100 - firstVertextIntraCost;
         partitionScoresSecond[id] = secondVertextInterCost - secondVertextIntraCost;
         id++;
     }
@@ -192,8 +215,12 @@ partitionedEdge Partitioner::fennelPartitioning(std::pair<std::string, std::stri
     if (firstIndex == secondIndex) {
         partitions[firstIndex].addEdge(edge);
     } else {
-        partitions[firstIndex].addToEdgeCuts(edge.first, edge.second, secondIndex);
-        partitions[secondIndex].addToEdgeCuts(edge.second, edge.first, firstIndex);
+        if(firstIndex>secondIndex){
+            partitions[secondIndex].addToEdgeCuts(edge.second, edge.first, firstIndex);
+        }
+        else{
+            partitions[firstIndex].addToEdgeCuts(edge.first, edge.second, secondIndex);
+        }
     }
     this->totalEdges += 1;
     return {{edge.first, firstIndex}, {edge.second, secondIndex}};

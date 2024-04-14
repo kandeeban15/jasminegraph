@@ -69,6 +69,8 @@ class Partition {
     void printEdges();
     bool isExist(std::string);
     bool isExistInEdgeCuts(std::string);
+
+    std::set<std::string> getAllVertices();
 };
 
 #endif

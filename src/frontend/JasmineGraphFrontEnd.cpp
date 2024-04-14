@@ -116,7 +116,7 @@ void *frontendservicesesion(void *dummyPt) {
     std::string kafka_server_IP;
     cppkafka::Configuration configs;
     KafkaConnector *kstream;
-    Partitioner graphPartitioner(numberOfPartitions, 1, spt::Algorithms::HASH);
+    Partitioner graphPartitioner(numberOfPartitions, 1, spt::Algorithms::LDG);
 
     for (int i = 0; i < workerList.size(); i++) {
         Utils::worker currentWorker = workerList.at(i);
@@ -1220,7 +1220,7 @@ static void add_stream_kafka_command(int connFd, std::string &kafka_server_IP, c
     // create kafka consumer and graph partitioner
     kstream = new KafkaConnector(configs);
 // Create the Partitioner object.
-    Partitioner graphPartitioner(numberOfPartitions, 0, spt::Algorithms::FENNEL);
+    Partitioner graphPartitioner(numberOfPartitions, 0, spt::Algorithms::LDG);
 // Create the KafkaConnector object.
     kstream = new KafkaConnector(configs);
     // Subscribe to the Kafka topic.

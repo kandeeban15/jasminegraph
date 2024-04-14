@@ -53,24 +53,19 @@ NodeManager::NodeManager(GraphConfig gConfig) {
 
     if (gConfig.maxLabelSize) {
         setIndexKeySize(gConfig.maxLabelSize);
-    }
-
-    if (gConfig.maxLabelSize) {
         node_manager_logger.info("Setting index key size to: " + std::to_string(gConfig.maxLabelSize));
+
     }
 
     std::ios_base::openmode openMode = std::ios::in | std::ios::out;  // Default mode
     if (gConfig.openMode == NodeManager::FILE_MODE) {
         this->nodeIndex = readNodeIndex();
-    } else {
-        openMode |= std::ios::trunc;
-    }
-
-    if (gConfig.openMode == NodeManager::FILE_MODE) {
         node_manager_logger.info("Using APPEND mode for file operations.");
     } else {
+        openMode |= std::ios::trunc;
         node_manager_logger.info("Using TRUNC mode for file operations.");
     }
+
 
     NodeBlock::nodesDB = Utils::openFile(nodesDBPath, openMode);
     PropertyLink::propertiesDB = Utils::openFile(propertiesDBPath, openMode);
@@ -245,11 +240,15 @@ NodeBlock *NodeManager::addNode(std::string nodeId) {
     return this->get(nodeId);
 }
 
-RelationBlock *NodeManager::addLocalEdge(std::pair<std::string, std::string> edge) {
+RelationBlock *NodeManager::addLocalEdge(std::pair<std::string, std::string> edge, std::pair<unsigned int, unsigned int> pid_pair) {
     pthread_mutex_lock(&lockEdgeAdd);
 
     NodeBlock *sourceNode = this->addNode(edge.first);
     NodeBlock *destNode = this->addNode(edge.second);
+    if(sourceNode && destNode){
+        sourceNode->setPartitionId(pid_pair.first);
+        destNode->setPartitionId(pid_pair.second);
+    }
     RelationBlock *newRelation = this->addLocalRelation(*sourceNode, *destNode);
     if (newRelation) {
         newRelation->setDestination(destNode);
@@ -262,7 +261,7 @@ RelationBlock *NodeManager::addLocalEdge(std::pair<std::string, std::string> edg
     return newRelation;
 }
 
-RelationBlock *NodeManager::addCentralEdge(std::pair<std::string, std::string> edge) {
+RelationBlock *NodeManager::addCentralEdge(std::pair<std::string, std::string> edge, std::pair<unsigned int, unsigned int> pid_pair) {
     //    std::unique_lock<std::mutex> guard1(lockCentralEdgeAdd);
     //
     //    guard1.lock();
@@ -270,6 +269,10 @@ RelationBlock *NodeManager::addCentralEdge(std::pair<std::string, std::string> e
 
     NodeBlock *sourceNode = this->addNode(edge.first);
     NodeBlock *destNode = this->addNode(edge.second);
+    if(sourceNode && destNode){
+        sourceNode->setPartitionId(pid_pair.first);
+        destNode->setPartitionId(pid_pair.second);
+    }
     RelationBlock *newRelation = this->addCentralRelation(*sourceNode, *destNode);
     if (newRelation) {
         newRelation->setDestination(destNode);

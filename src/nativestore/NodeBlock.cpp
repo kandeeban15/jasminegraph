@@ -49,7 +49,6 @@ void NodeBlock::save() {
     //    pthread_mutex_lock(&lockSaveNode);
     char _label[PropertyLink::MAX_VALUE_SIZE] = {0};
     std::strcpy(_label, id.c_str());
-
     bool isSmallLabel = id.length() <= sizeof(label) * 2;
         if (isSmallLabel) {
             std::strcpy(this->label, this->id.c_str());
@@ -57,6 +56,7 @@ void NodeBlock::save() {
     NodeBlock::nodesDB->seekp(this->addr);
     NodeBlock::nodesDB->put(this->usage);                                                                       // 1
     NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(this->nodeId)), sizeof(this->nodeId));                  // 4
+    NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(this->pid)), sizeof(this->pid));                  // 4
     NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(this->edgeRef)), sizeof(this->edgeRef));                // 4
     NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(this->centralEdgeRef)), sizeof(this->centralEdgeRef));  // 4
     NodeBlock::nodesDB->put(this->edgeRefPID);                                                                  // 1
@@ -65,9 +65,59 @@ void NodeBlock::save() {
     NodeBlock::nodesDB->flush();  // Sync the file with in-memory stream
     //    pthread_mutex_unlock(&lockSaveNode);
 
+    nodesDB->seekg(0, std::ios::beg);
+
+    char usage;
+    unsigned int nodeId, pid, edgeRef, centralEdgeRef, propRef;
+    unsigned char edgeRefPID;
+    char readLabel[sizeof(this->label)];
+
+    while (!nodesDB->eof()) {
+        nodesDB->read(&usage, sizeof(usage));
+        nodesDB->read(reinterpret_cast<char*>(&nodeId), sizeof(nodeId));
+        nodesDB->read(reinterpret_cast<char*>(&pid), sizeof(pid));
+        nodesDB->read(reinterpret_cast<char*>(&edgeRef), sizeof(edgeRef));
+        nodesDB->read(reinterpret_cast<char*>(&centralEdgeRef), sizeof(centralEdgeRef));
+        nodesDB->read(reinterpret_cast<char*>(&edgeRefPID), sizeof(edgeRefPID));
+        nodesDB->read(reinterpret_cast<char*>(&propRef), sizeof(propRef));
+        nodesDB->read(readLabel, sizeof(readLabel));
+
+        if(nodesDB->gcount() == 0) break; // Exit loop if no data was read
+
+        std::stringstream logMessage;
+        logMessage << "Read Node Data:\n";
+        logMessage << "Usage: " << usage << "\n";
+        logMessage << "Node ID: " << nodeId << "\n";
+        logMessage << "Partition ID: " << pid << "\n";
+        logMessage << "Edge Reference: " << edgeRef << "\n";
+        logMessage << "Central Edge Reference: " << centralEdgeRef << "\n";
+        logMessage << "Edge Reference PID: " << static_cast<int>(edgeRefPID) << "\n"; // Cast to int to print as number
+        logMessage << "Property Reference: " << propRef << "\n";
+        logMessage << "Label: " << std::string(readLabel, sizeof(readLabel)).c_str() << "\n";
+
+        node_block_logger.info(logMessage.str());
+
+        if (nodesDB->eof() || nodesDB->fail()) break;
+    }
+
+    nodesDB->clear();
+    nodesDB->seekp(0, std::ios::end);
+
         if (!isSmallLabel) {
             this->addProperty("label", _label);
         }
+}
+
+
+bool NodeBlock::setPartitionId(unsigned int pid) {
+    int edgeReferenceOffset = sizeof(this->usage) + sizeof(this->nodeId);
+    NodeBlock::nodesDB->seekp(this->addr + edgeReferenceOffset);
+    if (!NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(pid)), sizeof(unsigned int))) {
+        node_block_logger.error("ERROR: Error while updating edge reference address of " +
+                                std::to_string(pid) + " for node " + std::to_string(this->addr));
+        return false;
+    }
+    return true;
 }
 
 void NodeBlock::addProperty(std::string name, const char* value) {
@@ -79,7 +129,7 @@ void NodeBlock::addProperty(std::string name, const char* value) {
             // If it was an empty prop link before inserting, Then update the property reference of this node
             // block
             //            node_block_logger.info("propRef = " + std::to_string(this->propRef));
-            NodeBlock::nodesDB->seekp(this->addr + sizeof(this->nodeId) + sizeof(this->edgeRef) +
+            NodeBlock::nodesDB->seekp(this->addr + sizeof(this->usage) + sizeof(this->nodeId) + sizeof(this->pid) + sizeof(this->edgeRef) +
                                       sizeof(this->centralEdgeRef) + sizeof(this->edgeRefPID));
             NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(this->propRef)), sizeof(this->propRef));
             NodeBlock::nodesDB->flush();
@@ -208,7 +258,7 @@ RelationBlock* NodeBlock::getCentralRelationHead() {
 
 bool NodeBlock::setLocalRelationHead(RelationBlock newRelation) {
     unsigned int edgeReferenceAddress = newRelation.addr;
-    int edgeReferenceOffset = sizeof(this->usage) + sizeof(this->nodeId);
+    int edgeReferenceOffset = sizeof(this->usage) + sizeof(this->nodeId) + sizeof(this->pid);
     NodeBlock::nodesDB->seekp(this->addr + edgeReferenceOffset);
     if (!NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(edgeReferenceAddress)), sizeof(unsigned int))) {
         node_block_logger.error("ERROR: Error while updating edge reference address of " +
@@ -222,7 +272,7 @@ bool NodeBlock::setLocalRelationHead(RelationBlock newRelation) {
 
 bool NodeBlock::setCentralRelationHead(RelationBlock newRelation) {
     unsigned int centralEdgeReferenceAddress = newRelation.addr;
-    int edgeReferenceOffset = sizeof(this->usage) + sizeof(this->nodeId);
+    int edgeReferenceOffset = sizeof(this->usage) + sizeof(this->nodeId) + sizeof(this->pid);
     NodeBlock::nodesDB->seekp(this->addr + edgeReferenceOffset + sizeof(this->edgeRef));
     if (!NodeBlock::nodesDB->write(reinterpret_cast<char*>(&(centralEdgeReferenceAddress)), sizeof(unsigned int))) {
         node_block_logger.error("ERROR: Error while updating edge reference address of " +

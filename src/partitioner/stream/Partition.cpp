@@ -85,6 +85,25 @@ double Partition::getVertextCount() {
     return edgeListVetices + edgeCutVertices;
 }
 
+// Method to get all unique vertices
+std::set<std::string> Partition::getAllVertices() {
+    std::set<std::string> vertices;
+
+    // Add vertices from edgeList
+    for (auto edge : this->edgeList) {
+        vertices.insert(edge.first);
+    }
+
+    // Add vertices from edgeCuts
+    for (size_t i = 0; i < numberOfPartitions; i++) {
+        for (auto edge : edgeCuts[i]) {
+            vertices.insert(edge.first);
+        }
+    }
+
+    return vertices;
+}
+
 double Partition::getVertextCountQuick() { return this->vertexCount; }
 
 template <typename Out>
